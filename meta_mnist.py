@@ -165,7 +165,7 @@ def main(lr=0.005, maml_lr=0.01, iterations=1000, ways=1, shots=16, tps=32, fas=
 
     train_tasks = l2l.data.TaskDataset(mnist_train,
                                        task_transforms=[
-                                            l2l.data.transforms.FusedNWaysKShots(mnist_train, n=ways, k=shots*2, replacement=False, filter_labels=[0, 1, 2, 3, 4, 5, 6, 7, 8]),
+                                            l2l.data.transforms.FusedNWaysKShots(mnist_train, n=ways, k=shots*5, replacement=False, filter_labels=[0, 1, 2, 3, 4, 5, 6, 7, 8]),
                                             # l2l.data.transforms.NWays(mnist_train, ways),
                                             # l2l.data.transforms.KShots(mnist_train, shots*2),
                                             l2l.data.transforms.LoadData(mnist_train),
@@ -191,16 +191,7 @@ def main(lr=0.005, maml_lr=0.01, iterations=1000, ways=1, shots=16, tps=32, fas=
     opt = optim.Adam(meta_model.parameters(), lr=lr)
     # loss_func = nn.NLLLoss(reduction='mean')
 
-    meta_model.load_state_dict(torch.load('./result/pre_trainedmodel'))
-
-    # base_param_names, base_param_values = [], []
-    # for name, param in meta_model.named_parameters():
-    #     if param.requires_grad:
-    #         base_param_names.append(name)
-    #         base_param_values.append(param.data.cpu().numpy())
-    #         print ('task', name, len(param.data.cpu().numpy()))
-
-    # pickle.dump(base_param_names, open( "./result/param_name" + ".p", "wb" ) )
+    # meta_model.load_state_dict(torch.load('./result/pre_trainedmodel'))
 
     for iteration in range(iterations):
         iteration_error = 0.0
@@ -278,7 +269,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--ways', type=int, default=1, metavar='N',
                         help='number of ways (default: 5)')
-    parser.add_argument('--shots', type=int, default=32, metavar='N',
+    parser.add_argument('--shots', type=int, default=8, metavar='N',
                         help='number of shots (default: 1)')
     parser.add_argument('-tps', '--tasks-per-step', type=int, default=16, metavar='N',
                         help='tasks per step (default: 32)')
