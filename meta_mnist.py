@@ -15,59 +15,13 @@ from torchvision.datasets import MNIST
 import learn2learn as l2l
 import torchvision.utils as vutils
 
+from meta_sgd import MetaSGD
+from network_structure import Net
 import os
 
 directory = './result'
 if not os.path.exists(directory):
     os.makedirs(directory)
-    
-class Net(nn.Module):
-    def __init__(self, latent_size):
-        super(Net, self).__init__()
-        self.latent_size = latent_size
-        self.encoder = nn.Sequential(
-            nn.Linear(28*28, 64),
-            nn.BatchNorm1d(64),
-            nn.ReLU(True), 
-
-            # nn.Linear(256, 128),
-            # nn.BatchNorm1d(128),
-            # nn.ReLU(True), 
-        )
-        
-        self.mu = nn.Linear(64, latent_size)
-        self.logvar = nn.Linear(64, latent_size)
-        self.relu = nn.ReLU(True)
-        
-        self.decoder = nn.Sequential(
-            nn.Linear(latent_size, 64),
-            nn.BatchNorm1d(64),
-            nn.ReLU(True), 
-
-            nn.Linear(64, 28*28),
-            nn.Sigmoid(),
-        )
-
-    def reparameterize(self, mu, logvar):
-        if self.training:
-            std = torch.exp(0.5*logvar)
-            eps = torch.randn_like(std)
-            return eps.mul(std).add_(mu)
-        else:
-            return mu
-
-    def forward(self, input_img):
-        input_flat = input_img.view(-1, 28*28)
-        x = self.encoder(input_flat)
-        mu = self.relu(self.mu(x))
-        logvar = self.relu(self.logvar(x))
-        sample = self.reparameterize(mu, logvar)
-        
-        result = self.decoder(sample)
-        
-        # print(x[0][0].item(), mu[0][0].item(), logvar[0][0].item(), sample[0][0].item(), result[0][0].item())
-
-        return result, mu, logvar
 
 def save_result(adapt_x = None, adaptation_data=None, eval_x=None, evaluation_data=None, index=None):
     if index is None:
@@ -165,7 +119,7 @@ def main(lr=0.005, maml_lr=0.01, iterations=1000, ways=1, shots=16, tps=32, fas=
 
     train_tasks = l2l.data.TaskDataset(mnist_train,
                                        task_transforms=[
-                                            l2l.data.transforms.FusedNWaysKShots(mnist_train, n=ways, k=shots*5, replacement=False, filter_labels=[0, 1, 2, 3, 4, 5, 6, 7, 8]),
+                                            l2l.data.transforms.FusedNWaysKShots(mnist_train, n=ways, k=shots*2, replacement=False, filter_labels=[1]),
                                             # l2l.data.transforms.NWays(mnist_train, ways),
                                             # l2l.data.transforms.KShots(mnist_train, shots*2),
                                             l2l.data.transforms.LoadData(mnist_train),
@@ -187,9 +141,12 @@ def main(lr=0.005, maml_lr=0.01, iterations=1000, ways=1, shots=16, tps=32, fas=
 
     model = Net(3)
     model.to(device)
-    meta_model = l2l.algorithms.MetaSGD(model, lr=maml_lr)
+    # meta_model = l2l.algorithms.MetaSGD(model, lr=maml_lr)
+    meta_model = MetaSGD(model, lr=maml_lr)
     opt = optim.Adam(meta_model.parameters(), lr=lr)
     # loss_func = nn.NLLLoss(reduction='mean')
+
+    # meta_model.load_state_dict(torch.load('./result/model'))
 
     # meta_model.load_state_dict(torch.load('./result/pre_trainedmodel'))
 
@@ -215,22 +172,26 @@ def main(lr=0.005, maml_lr=0.01, iterations=1000, ways=1, shots=16, tps=32, fas=
 
             # print(adaptation_data.shape, evaluation_data.shape)
 
-            # Fast Adaptation
-            # print()
-            loss = []
-            adapt_x, eval_x = None, None
-            for step in range(fas):
-                # print(step)
-                adapt_x, adapt_mu, adapt_log_var = learner(adaptation_data)
-                train_error = loss_func(adapt_x, adaptation_data, adapt_mu, adapt_log_var)
-                learner.adapt(train_error)
-                loss.append(train_error.item()/len(adaptation_data))
-                # print(step, train_error.item()/len(adaptation_data))
-                if iteration%50 == 0 and (step==0):
-                    save_result(adapt_x = adapt_x, adaptation_data=adaptation_data, eval_x=None, evaluation_data=None, index=t)
+            # # Fast Adaptation
+            # # print()
+            # loss = []
+            # adapt_x, eval_x = None, None
+            # for step in range(fas):
+            #     # print(step)
+            #     adapt_x, adapt_mu, adapt_log_var = learner(adaptation_data)
+            #     # sample_x, adapt_mu, adapt_log_var = learner.encode(adaptation_data)
+            #     # sample_x, adapt_mu, adapt_log_var = sample_x.detach(), adapt_mu.detach(), adapt_log_var.detach()
+            #     # adapt_x = learner.decoder(sample_x)
+                
+            #     train_error = loss_func(adapt_x, adaptation_data, adapt_mu, adapt_log_var)
+            #     learner.adapt(train_error)
+            #     loss.append(train_error.item()/len(adaptation_data))
+            #     # print(step, train_error.item()/len(adaptation_data))
+            #     if iteration%50 == 0 and (step==0):
+            #         save_result(adapt_x = adapt_x, adaptation_data=adaptation_data, eval_x=None, evaluation_data=None, index=t)
 
-            if t == 0:
-                print(loss)
+            # if t == 0:
+            #     print(loss)
 
             # save_gradients(base_param_values, learner.named_parameters(), t)
         
@@ -245,15 +206,15 @@ def main(lr=0.005, maml_lr=0.01, iterations=1000, ways=1, shots=16, tps=32, fas=
             iteration_acc += valid_accuracy
 
             if iteration%50 == 0:
-                save_result(adapt_x = adapt_x, adaptation_data=adaptation_data, eval_x=eval_x, evaluation_data=evaluation_data, index=str(t)+"_d")
+                save_result(adapt_x = None, adaptation_data=None, eval_x=eval_x, evaluation_data=evaluation_data, index=str(t)+"_d")
 
         iteration_error /= tps
         iteration_acc /= tps
         print(iteration, 'Loss : {:.3f} Acc : {:.3f}'.format(iteration_error.item(), iteration_acc))
 
-        if iteration%50 == 0:
-            model_param = eval_model(meta_model, test_tasks, fas)
-            # save_gradients(base_param_values, model_param, 'test')
+        # if iteration%50 == 0:
+        #     model_param = eval_model(meta_model, test_tasks, fas)
+        #     # save_gradients(base_param_values, model_param, 'test')
 
         # Take the meta-learning step
         opt.zero_grad()
@@ -269,11 +230,11 @@ if __name__ == '__main__':
 
     parser.add_argument('--ways', type=int, default=1, metavar='N',
                         help='number of ways (default: 5)')
-    parser.add_argument('--shots', type=int, default=8, metavar='N',
+    parser.add_argument('--shots', type=int, default=32, metavar='N',
                         help='number of shots (default: 1)')
-    parser.add_argument('-tps', '--tasks-per-step', type=int, default=16, metavar='N',
+    parser.add_argument('-tps', '--tasks-per-step', type=int, default=1, metavar='N',
                         help='tasks per step (default: 32)')
-    parser.add_argument('-fas', '--fast-adaption-steps', type=int, default=5, metavar='N',
+    parser.add_argument('-fas', '--fast-adaption-steps', type=int, default=0, metavar='N',
                         help='steps per fast adaption (default: 5)')
 
     parser.add_argument('--iterations', type=int, default=10000, metavar='N',
