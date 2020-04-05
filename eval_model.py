@@ -166,7 +166,7 @@ def main(lr=0.005, maml_lr=0.01, iterations=1000, ways=1, shots=16, tps=32, fas=
 
     train_tasks = l2l.data.TaskDataset(mnist_train,
                                        task_transforms=[
-                                            l2l.data.transforms.FusedNWaysKShots(mnist_train, n=ways, k=shots*2, replacement=False, filter_labels=[1]),
+                                            l2l.data.transforms.FusedNWaysKShots(mnist_train, n=ways, k=shots*2, replacement=False, filter_labels=[0, 1, 2, 3, 4, 5, 6, 7, 8]),
                                             # l2l.data.transforms.NWays(mnist_train, ways),
                                             # l2l.data.transforms.KShots(mnist_train, shots*2),
                                             l2l.data.transforms.LoadData(mnist_train),
